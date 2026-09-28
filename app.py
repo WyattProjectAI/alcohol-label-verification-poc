@@ -1,4 +1,5 @@
 import hashlib
+import re
 import streamlit as st
 
 from ai_extractor import extract_label_data
@@ -19,25 +20,158 @@ st.write(
 
 def normalize_text(value):
     """
-    Normalize basic spacing and capitalization before comparison.
+    Normalize capitalization, punctuation, and whitespace for
+    general text comparisons.
     """
     if value is None:
         return ""
 
-    return " ".join(str(value).strip().lower().split())
+    text = str(value).casefold().strip()
+
+    # Treat ampersands consistently.
+    text = text.replace("&", " and ")
+
+    # Remove punctuation while keeping letters and numbers.
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+
+    return " ".join(text.split())
 
 
-def compare_field(expected, observed):
+def normalize_country(value):
     """
-    Compare expected application data against observed label data.
+    Normalize common United States country-name variants.
     """
-    expected_normalized = normalize_text(expected)
-    observed_normalized = normalize_text(observed)
+    normalized = normalize_text(value)
 
-    if not observed_normalized:
+    us_variants = {
+        "us",
+        "usa",
+        "u s",
+        "u s a",
+        "united states",
+        "united states of america"
+    }
+
+    if normalized in us_variants:
+        return "united states"
+
+    return normalized
+
+
+def parse_volume_ml(value):
+    """
+    Convert common mL and L volume formats into milliliters.
+    Returns None when no supported volume can be identified.
+    """
+    if not value:
+        return None
+
+    text = str(value).casefold().replace(",", "").strip()
+
+    ml_match = re.search(
+        r"(\d+(?:\.\d+)?)\s*(?:ml|milliliter|milliliters)",
+        text
+    )
+
+    if ml_match:
+        return float(ml_match.group(1))
+
+    liter_match = re.search(
+        r"(\d+(?:\.\d+)?)\s*(?:l|liter|liters|litre|litres)\b",
+        text
+    )
+
+    if liter_match:
+        return float(liter_match.group(1)) * 1000
+
+    return None
+
+
+def parse_alcohol(value):
+    """
+    Extract ABV percentage and proof values when present.
+    """
+    if not value:
+        return None, None
+
+    text = str(value).casefold()
+
+    abv_match = re.search(
+        r"(\d+(?:\.\d+)?)\s*%",
+        text
+    )
+
+    proof_match = re.search(
+        r"(\d+(?:\.\d+)?)\s*proof",
+        text
+    )
+
+    abv = float(abv_match.group(1)) if abv_match else None
+    proof = float(proof_match.group(1)) if proof_match else None
+
+    return abv, proof
+
+
+def compare_field(field_name, expected, observed):
+    """
+    Compare application data with extracted label data using
+    field-specific normalization.
+
+    Returns:
+        MATCH
+        MISMATCH
+        MISSING
+        NEEDS REVIEW
+    """
+
+    if not normalize_text(expected):
+        return "NEEDS REVIEW"
+
+    if not normalize_text(observed):
         return "MISSING"
 
-    if expected_normalized == observed_normalized:
+    # Country comparison
+    if field_name == "Country of Origin":
+        if normalize_country(expected) == normalize_country(observed):
+            return "MATCH"
+
+        return "MISMATCH"
+
+    # Net contents comparison
+    if field_name == "Net Contents":
+        expected_ml = parse_volume_ml(expected)
+        observed_ml = parse_volume_ml(observed)
+
+        if expected_ml is not None and observed_ml is not None:
+            if abs(expected_ml - observed_ml) < 0.1:
+                return "MATCH"
+
+            return "MISMATCH"
+
+    # Alcohol comparison
+    if field_name == "Alcohol Content":
+        expected_abv, expected_proof = parse_alcohol(expected)
+        observed_abv, observed_proof = parse_alcohol(observed)
+
+        comparable_values = 0
+
+        if expected_abv is not None and observed_abv is not None:
+            comparable_values += 1
+
+            if abs(expected_abv - observed_abv) > 0.05:
+                return "MISMATCH"
+
+        if expected_proof is not None and observed_proof is not None:
+            comparable_values += 1
+
+            if abs(expected_proof - observed_proof) > 0.1:
+                return "MISMATCH"
+
+        if comparable_values > 0:
+            return "MATCH"
+
+    # General text comparison
+    if normalize_text(expected) == normalize_text(observed):
         return "MATCH"
 
     return "MISMATCH"
@@ -345,6 +479,7 @@ if analyze_button:
             observed = observed_data[field_name]
 
             status = compare_field(
+                field_name,
                 expected,
                 observed
             )
@@ -368,6 +503,9 @@ if analyze_button:
 
             elif status == "MISSING":
                 col4.warning("MISSING")
+
+            elif status == "NEEDS REVIEW":
+                col4.warning("NEEDS REVIEW")
 
             else:
                 col4.error("MISMATCH")
