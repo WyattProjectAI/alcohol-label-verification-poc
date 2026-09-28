@@ -1,6 +1,9 @@
+import hashlib
 import streamlit as st
 
-# Configure browser tab and page layout.
+from ai_extractor import extract_label_data
+
+
 st.set_page_config(
     page_title="Alcohol Label Verification POC",
     layout="wide"
@@ -16,8 +19,7 @@ st.write(
 
 def normalize_text(value):
     """
-    Normalize text before comparison so harmless differences in
-    capitalization or spacing do not create false mismatches.
+    Normalize basic spacing and capitalization before comparison.
     """
     if value is None:
         return ""
@@ -27,13 +29,7 @@ def normalize_text(value):
 
 def compare_field(expected, observed):
     """
-    Compare an expected application value with a value extracted
-    from label artwork.
-
-    Returns:
-        MATCH        - Values are equivalent after normalization.
-        MISSING      - No value was found on the label.
-        MISMATCH     - A different value was found.
+    Compare expected application data against observed label data.
     """
     expected_normalized = normalize_text(expected)
     observed_normalized = normalize_text(observed)
@@ -47,9 +43,9 @@ def compare_field(expected, observed):
     return "MISMATCH"
 
 
-# -------------------------------------------------------------------
-# Application information
-# -------------------------------------------------------------------
+# ---------------------------------------------------------
+# Application information and label artwork
+# ---------------------------------------------------------
 
 left_col, right_col = st.columns(2)
 
@@ -106,70 +102,176 @@ with right_col:
             use_container_width=True
         )
 
-        st.success("Label image uploaded successfully.")
+
+# ---------------------------------------------------------
+# AI extraction
+# ---------------------------------------------------------
+
+st.divider()
+st.subheader("AI Label Extraction")
+
+if uploaded_file is not None:
+
+    # Create a fingerprint so results from an old image are not
+    # accidentally used after a different image is uploaded.
+    image_hash = hashlib.sha256(
+        uploaded_file.getvalue()
+    ).hexdigest()
+
+    if (
+        st.session_state.get("image_hash")
+        and st.session_state["image_hash"] != image_hash
+    ):
+        st.session_state.pop("extracted_data", None)
+
+    st.session_state["image_hash"] = image_hash
+
+    if st.button(
+        "Extract Label Information with AI",
+        type="primary"
+    ):
+        try:
+            with st.spinner("Analyzing label artwork..."):
+                extracted_data = extract_label_data(uploaded_file)
+
+            st.session_state["extracted_data"] = extracted_data
+            st.success("AI extraction completed.")
+
+        except Exception as exc:
+            st.error(
+                "AI extraction failed. "
+                f"Technical detail: {exc}"
+            )
+
+else:
+    st.info("Upload label artwork to enable AI extraction.")
 
 
-# -------------------------------------------------------------------
-# Temporary manual extraction test harness
-# -------------------------------------------------------------------
+# ---------------------------------------------------------
+# Display AI extraction
+# ---------------------------------------------------------
+
+extracted_data = st.session_state.get("extracted_data")
+
+if extracted_data:
+
+    st.write("### Extracted Label Information")
+
+    extraction_rows = [
+        {
+            "Field": "Brand Name",
+            "Extracted Value": extracted_data.get("brand_name", "")
+        },
+        {
+            "Field": "Class / Type",
+            "Extracted Value": extracted_data.get("class_type", "")
+        },
+        {
+            "Field": "Alcohol Content",
+            "Extracted Value": extracted_data.get(
+                "alcohol_content", ""
+            )
+        },
+        {
+            "Field": "Net Contents",
+            "Extracted Value": extracted_data.get(
+                "net_contents", ""
+            )
+        },
+        {
+            "Field": "Producer Name",
+            "Extracted Value": extracted_data.get(
+                "producer_name", ""
+            )
+        },
+        {
+            "Field": "Producer Address",
+            "Extracted Value": extracted_data.get(
+                "producer_address", ""
+            )
+        },
+        {
+            "Field": "Country of Origin",
+            "Extracted Value": extracted_data.get(
+                "country_of_origin", ""
+            )
+        },
+        {
+            "Field": "Government Warning",
+            "Extracted Value": extracted_data.get(
+                "government_warning_text", ""
+            )
+        }
+    ]
+
+    st.table(extraction_rows)
+
+
+# ---------------------------------------------------------
+# Manual developer test harness
+# ---------------------------------------------------------
 
 st.divider()
 
-with st.expander("Developer Test Harness: Simulated Label Extraction"):
-    st.caption(
-        "Temporary testing controls. These fields simulate values that "
-        "will later be extracted automatically by the AI model."
-    )
+use_manual_data = st.checkbox(
+    "Developer mode: use manually entered extraction data"
+)
 
-    observed_brand = st.text_input(
-        "Observed Brand Name",
-        key="observed_brand"
-    )
+manual_data = {}
 
-    observed_class = st.text_input(
-        "Observed Class / Type",
-        key="observed_class"
-    )
+if use_manual_data:
 
-    observed_alcohol = st.text_input(
-        "Observed Alcohol Content",
-        key="observed_alcohol"
-    )
+    with st.expander(
+        "Developer Test Harness",
+        expanded=True
+    ):
 
-    observed_net = st.text_input(
-        "Observed Net Contents",
-        key="observed_net"
-    )
+        st.caption(
+            "Manual fallback for testing comparison logic "
+            "without making an AI API request."
+        )
 
-    observed_producer = st.text_input(
-        "Observed Bottler / Producer Name",
-        key="observed_producer"
-    )
+        manual_data["brand_name"] = st.text_input(
+            "Observed Brand Name"
+        )
 
-    observed_address = st.text_input(
-        "Observed Bottler / Producer Address",
-        key="observed_address"
-    )
+        manual_data["class_type"] = st.text_input(
+            "Observed Class / Type"
+        )
 
-    observed_country = st.text_input(
-        "Observed Country of Origin",
-        key="observed_country"
-    )
+        manual_data["alcohol_content"] = st.text_input(
+            "Observed Alcohol Content"
+        )
 
-    government_warning_found = st.checkbox(
-        "Government Health Warning found on label"
-    )
+        manual_data["net_contents"] = st.text_input(
+            "Observed Net Contents"
+        )
+
+        manual_data["producer_name"] = st.text_input(
+            "Observed Producer Name"
+        )
+
+        manual_data["producer_address"] = st.text_input(
+            "Observed Producer Address"
+        )
+
+        manual_data["country_of_origin"] = st.text_input(
+            "Observed Country of Origin"
+        )
+
+        manual_data["government_warning_found"] = st.checkbox(
+            "Government Health Warning found"
+        )
 
 
-# -------------------------------------------------------------------
-# Analysis
-# -------------------------------------------------------------------
+# ---------------------------------------------------------
+# Verification
+# ---------------------------------------------------------
 
 st.divider()
 
 analyze_button = st.button(
-    "Analyze Label",
-    type="primary",
+    "Compare Application Against Label",
     use_container_width=True
 )
 
@@ -181,7 +283,13 @@ if analyze_button:
     elif not brand_name.strip():
         st.error("Please enter the expected brand name.")
 
+    elif not use_manual_data and not extracted_data:
+        st.error(
+            "Run AI extraction before comparing the label."
+        )
+
     else:
+
         expected_data = {
             "Brand Name": brand_name,
             "Class / Type": class_type,
@@ -192,37 +300,75 @@ if analyze_button:
             "Country of Origin": country_of_origin
         }
 
+        source_data = (
+            manual_data
+            if use_manual_data
+            else extracted_data
+        )
+
         observed_data = {
-            "Brand Name": observed_brand,
-            "Class / Type": observed_class,
-            "Alcohol Content": observed_alcohol,
-            "Net Contents": observed_net,
-            "Producer Name": observed_producer,
-            "Producer Address": observed_address,
-            "Country of Origin": observed_country
+            "Brand Name": source_data.get(
+                "brand_name", ""
+            ),
+            "Class / Type": source_data.get(
+                "class_type", ""
+            ),
+            "Alcohol Content": source_data.get(
+                "alcohol_content", ""
+            ),
+            "Net Contents": source_data.get(
+                "net_contents", ""
+            ),
+            "Producer Name": source_data.get(
+                "producer_name", ""
+            ),
+            "Producer Address": source_data.get(
+                "producer_address", ""
+            ),
+            "Country of Origin": source_data.get(
+                "country_of_origin", ""
+            )
         }
+
+        warning_found = source_data.get(
+            "government_warning_found",
+            False
+        )
 
         st.subheader("Verification Results")
 
         statuses = []
 
         for field_name in expected_data:
+
             expected = expected_data[field_name]
             observed = observed_data[field_name]
 
-            status = compare_field(expected, observed)
+            status = compare_field(
+                expected,
+                observed
+            )
+
             statuses.append(status)
 
-            col1, col2, col3, col4 = st.columns([2, 3, 3, 2])
+            col1, col2, col3, col4 = st.columns(
+                [2, 3, 3, 2]
+            )
 
             col1.write(f"**{field_name}**")
-            col2.write(expected if expected else "Not provided")
-            col3.write(observed if observed else "Not detected")
+            col2.write(
+                expected if expected else "Not provided"
+            )
+            col3.write(
+                observed if observed else "Not detected"
+            )
 
             if status == "MATCH":
                 col4.success("MATCH")
+
             elif status == "MISSING":
                 col4.warning("MISSING")
+
             else:
                 col4.error("MISMATCH")
 
@@ -230,23 +376,23 @@ if analyze_button:
 
         st.write("**Government Health Warning**")
 
-        if government_warning_found:
+        if warning_found:
             st.success("FOUND")
         else:
             st.warning("NEEDS REVIEW")
 
-        # A reviewer should make the final compliance determination.
-        # The prototype identifies discrepancies rather than allowing
-        # the AI model to make an authoritative approval decision.
         if (
             all(status == "MATCH" for status in statuses)
-            and government_warning_found
+            and warning_found
         ):
             st.success(
-                "Label verification completed with no detected discrepancies."
+                "No discrepancies detected. "
+                "Reviewer verification is still required."
             )
+
         else:
             st.warning(
-                "Label requires reviewer attention. "
-                "One or more discrepancies or missing elements were detected."
+                "Reviewer attention required. "
+                "One or more discrepancies or missing "
+                "label elements were detected."
             )
