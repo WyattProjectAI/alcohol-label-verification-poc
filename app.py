@@ -176,6 +176,39 @@ def compare_field(field_name, expected, observed):
 
     return "MISMATCH"
 
+def validate_government_warning(warning_text):
+    """
+    Validate that the AI-extracted warning contains the major
+    required portions of the U.S. Government Health Warning.
+
+    Visual formatting requirements remain a reviewer responsibility.
+    """
+
+    if not warning_text or not warning_text.strip():
+        return "MISSING"
+
+    normalized = normalize_text(warning_text)
+
+    required_phrases = [
+        "government warning",
+        "according to the surgeon general",
+        "women should not drink alcoholic beverages during pregnancy",
+        "risk of birth defects",
+        "consumption of alcoholic beverages impairs your ability",
+        "drive a car or operate machinery",
+        "may cause health problems"
+    ]
+
+    missing_phrases = [
+        phrase
+        for phrase in required_phrases
+        if normalize_text(phrase) not in normalized
+    ]
+
+    if not missing_phrases:
+        return "MATCH"
+
+    return "NEEDS REVIEW"
 
 # ---------------------------------------------------------
 # Application information and label artwork
@@ -393,8 +426,10 @@ if use_manual_data:
             "Observed Country of Origin"
         )
 
-        manual_data["government_warning_found"] = st.checkbox(
-            "Government Health Warning found"
+        manual_data["government_warning_text"] = st.text_area(
+            "Observed Government Health Warning Text",
+            height=120,
+            placeholder="Enter extracted warning text for manual testing."
         )
 
 
@@ -464,9 +499,14 @@ if analyze_button:
             )
         }
 
-        warning_found = source_data.get(
-            "government_warning_found",
-            False
+        warning_text = source_data.get(
+            "government_warning_text",
+    
+            ""
+        )
+
+        warning_status = validate_government_warning(
+            warning_text
         )
 
         st.subheader("Verification Results")
@@ -514,23 +554,38 @@ if analyze_button:
 
         st.write("**Government Health Warning**")
 
-        if warning_found:
-            st.success("FOUND")
+        if warning_status == "MATCH":
+            st.success("CONTENT VERIFIED")
+
+        elif warning_status == "MISSING":
+            st.error("MISSING")
+
         else:
             st.warning("NEEDS REVIEW")
 
+        if warning_text:
+            with st.expander("View Extracted Government Warning"):
+                st.write(warning_text)
+
+        st.caption(
+            "Automated validation evaluates extracted warning content. "
+            "Visual formatting and regulatory presentation should be "
+            "confirmed by a reviewer."
+        )
+
+        st.divider()
+
         if (
             all(status == "MATCH" for status in statuses)
-            and warning_found
+            and warning_status == "MATCH"
         ):
             st.success(
                 "No discrepancies detected. "
                 "Reviewer verification is still required."
             )
-
         else:
             st.warning(
                 "Reviewer attention required. "
-                "One or more discrepancies or missing "
-                "label elements were detected."
+                "One or more discrepancies, missing elements, "
+                "or warning-content issues were detected."
             )
