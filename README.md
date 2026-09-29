@@ -114,14 +114,23 @@ http://localhost:8501
 
 ## Using the Prototype
 
-1. Enter the expected application information.
-2. Upload alcohol beverage label artwork in PNG or JPEG format.
-3. Select **Extract Label Information with AI**.
-4. Review the information extracted from the artwork.
-5. Select **Compare Application Against Label**.
-6. Review each field for Match, Mismatch, Missing, or Needs Review status.
-7. Review the Government Health Warning validation result.
-8. A human reviewer makes the final determination.
+1. Upload alcohol beverage label artwork in PNG or JPEG format.
+2. Select **Extract Label Information with AI**.
+3. Review the information extracted from the artwork.
+4. Enter expected application information manually, or select **Create Test Application from Extracted Label** to initialize demonstration data.
+5. When using the POC Test Helper, modify one or more Application Information fields if you want to test discrepancy detection.
+6. Select **Compare Application Against Label**.
+7. Review each field for Match, Mismatch, Missing, Not Checked, or Needs Review status.
+8. Review the Government Health Warning validation result.
+9. A human reviewer makes the final determination.
+
+### POC Test Helper
+
+The deployed prototype is not integrated with COLAs Online or another authoritative application database.
+
+For demonstration purposes, **Create Test Application from Extracted Label** initializes the Application Information fields using values extracted from the uploaded artwork. A reviewer can then change individual expected values to verify mismatch and missing-data detection.
+
+In a production implementation, expected application information would be retrieved independently from the authoritative application system rather than generated from the label being reviewed.
 
 ## Developer Test Mode
 

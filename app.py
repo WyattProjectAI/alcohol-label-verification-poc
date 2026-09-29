@@ -125,7 +125,7 @@ def compare_field(field_name, expected, observed):
     """
 
     if not normalize_text(expected):
-        return "NEEDS REVIEW"
+        return "NOT CHECKED"
 
     if not normalize_text(observed):
         return "MISSING"
@@ -210,6 +210,46 @@ def validate_government_warning(warning_text):
 
     return "NEEDS REVIEW"
 
+def load_extracted_as_application():
+    """
+    Populate the Application Information fields with the values
+    extracted from the uploaded label.
+
+    This is a POC testing helper only. In a production environment,
+    expected application data would come from an authoritative
+    application system or API.
+    """
+
+    data = st.session_state.get("extracted_data", {})
+
+    st.session_state["brand_name_input"] = data.get(
+        "brand_name", ""
+    )
+
+    st.session_state["class_type_input"] = data.get(
+        "class_type", ""
+    )
+
+    st.session_state["alcohol_content_input"] = data.get(
+        "alcohol_content", ""
+    )
+
+    st.session_state["net_contents_input"] = data.get(
+        "net_contents", ""
+    )
+
+    st.session_state["producer_name_input"] = data.get(
+        "producer_name", ""
+    )
+
+    st.session_state["producer_address_input"] = data.get(
+        "producer_address", ""
+    )
+
+    st.session_state["country_of_origin_input"] = data.get(
+        "country_of_origin", ""
+    )
+
 # ---------------------------------------------------------
 # Application information and label artwork
 # ---------------------------------------------------------
@@ -221,37 +261,44 @@ with left_col:
 
     brand_name = st.text_input(
         "Brand Name",
-        placeholder="OLD TOM DISTILLERY"
+        placeholder="OLD TOM DISTILLERY",
+        key="brand_name_input"
     )
 
     class_type = st.text_input(
         "Class / Type",
-        placeholder="Kentucky Straight Bourbon Whiskey"
+        placeholder="Kentucky Straight Bourbon Whiskey",
+        key="class_type_input"
     )
 
     alcohol_content = st.text_input(
         "Alcohol Content",
-        placeholder="45% Alc./Vol. (90 Proof)"
+        placeholder="45% Alc./Vol. (90 Proof)",
+        key="alcohol_content_input"
     )
 
     net_contents = st.text_input(
         "Net Contents",
-        placeholder="750 mL"
+        placeholder="750 mL",
+        key="net_contents_input"
     )
 
     producer_name = st.text_input(
         "Bottler / Producer Name",
-        placeholder="Old Tom Distillery LLC"
+        placeholder="Old Tom Distillery LLC",
+        key="producer_name_input"
     )
 
     producer_address = st.text_input(
         "Bottler / Producer Address",
-        placeholder="123 Bourbon Way, Frankfort, KY"
+        placeholder="123 Bourbon Way, Frankfort, KY",
+        key="producer_address_input"
     )
 
     country_of_origin = st.text_input(
         "Country of Origin",
-        placeholder="United States"
+        placeholder="United States",
+        key="country_of_origin_input"
     )
 
 with right_col:
@@ -372,7 +419,19 @@ if extracted_data:
     ]
 
     st.table(extraction_rows)
+    st.info(
+        "POC Test Helper: In a production environment, expected "
+        "application data would come from the authoritative application "
+        "system. For demonstration purposes, you can initialize a test "
+        "application from the extracted label values and then modify "
+        "individual fields to test discrepancy detection."
+    )
 
+    st.button(
+        "Create Test Application from Extracted Label",
+        on_click=load_extracted_as_application,
+        use_container_width=True
+    )
 
 # ---------------------------------------------------------
 # Manual developer test harness
@@ -541,11 +600,11 @@ if analyze_button:
             if status == "MATCH":
                 col4.success("MATCH")
 
-            elif status == "MISSING":
-                col4.warning("MISSING")
-
             elif status == "NEEDS REVIEW":
                 col4.warning("NEEDS REVIEW")
+
+            elif status == "NOT CHECKED":
+                col4.info("NOT CHECKED")
 
             else:
                 col4.error("MISMATCH")
@@ -575,12 +634,12 @@ if analyze_button:
 
         st.divider()
 
-        if (
-            all(status == "MATCH" for status in statuses)
-            and warning_status == "MATCH"
+        if all(
+                status in {"MATCH", "NOT CHECKED"}
+                for status in statuses
         ):
             st.success(
-                "No discrepancies detected. "
+                "No discrepancies detected in application fields provided. "
                 "Reviewer verification is still required."
             )
         else:
