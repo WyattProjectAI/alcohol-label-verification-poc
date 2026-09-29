@@ -178,34 +178,39 @@ def compare_field(field_name, expected, observed):
 
 def validate_government_warning(warning_text):
     """
-    Validate that the AI-extracted warning contains the major
-    required portions of the U.S. Government Health Warning.
+    Validate the required Government Health Warning text.
 
-    Visual formatting requirements remain a reviewer responsibility.
+    The required wording and punctuation are compared without
+    treating OCR capitalization differences in the body text as
+    a failure. The GOVERNMENT WARNING heading must still be present
+    in uppercase.
+
+    Visual requirements such as bold type, font size, separation,
+    and legibility remain reviewer responsibilities.
     """
 
     if not warning_text or not warning_text.strip():
         return "MISSING"
 
-    normalized = normalize_text(warning_text)
+    required_warning = (
+        "GOVERNMENT WARNING: (1) According to the Surgeon General, "
+        "women should not drink alcoholic beverages during pregnancy "
+        "because of the risk of birth defects. "
+        "(2) Consumption of alcoholic beverages impairs your ability "
+        "to drive a car or operate machinery, and may cause health problems."
+    )
 
-    required_phrases = [
-        "government warning",
-        "according to the surgeon general",
-        "women should not drink alcoholic beverages during pregnancy",
-        "risk of birth defects",
-        "consumption of alcoholic beverages impairs your ability",
-        "drive a car or operate machinery",
-        "may cause health problems"
-    ]
+    # Normalize whitespace introduced by OCR or image layout.
+    actual = re.sub(r"\s+", " ", warning_text.strip())
+    required = re.sub(r"\s+", " ", required_warning)
 
-    missing_phrases = [
-        phrase
-        for phrase in required_phrases
-        if normalize_text(phrase) not in normalized
-    ]
+    # The required heading must actually appear in uppercase.
+    if "GOVERNMENT WARNING:" not in actual:
+        return "NEEDS REVIEW"
 
-    if not missing_phrases:
+    # Compare required wording without penalizing OCR capitalization
+    # differences in the remainder of the warning.
+    if required.casefold() in actual.casefold():
         return "MATCH"
 
     return "NEEDS REVIEW"
@@ -600,6 +605,9 @@ if analyze_button:
             if status == "MATCH":
                 col4.success("MATCH")
 
+            elif status == "MISSING":
+                col4.warning("MISSING")
+
             elif status == "NEEDS REVIEW":
                 col4.warning("NEEDS REVIEW")
 
@@ -614,7 +622,7 @@ if analyze_button:
         st.write("**Government Health Warning**")
 
         if warning_status == "MATCH":
-            st.success("CONTENT VERIFIED")
+            st.success("WARNING TEXT VERIFIED")
 
         elif warning_status == "MISSING":
             st.error("MISSING")
@@ -634,9 +642,12 @@ if analyze_button:
 
         st.divider()
 
-        if all(
+        if (
+            all(
                 status in {"MATCH", "NOT CHECKED"}
                 for status in statuses
+            )
+            and warning_status == "MATCH"
         ):
             st.success(
                 "No discrepancies detected in application fields provided. "

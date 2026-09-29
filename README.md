@@ -68,6 +68,7 @@ This design reduces reliance on nondeterministic model judgment for final verifi
 - `ai_extractor.py` - AI-assisted image analysis and structured label-data extraction
 - `requirements.txt` - Python project dependencies
 - `.gitignore` - Excludes local environments, API credentials, and other non-source files
+- `examples/` - Example alcohol label images provided for demonstration and testing
 
 Tested with Python 3.13.3.
 
@@ -131,6 +132,17 @@ The deployed prototype is not integrated with COLAs Online or another authoritat
 For demonstration purposes, **Create Test Application from Extracted Label** initializes the Application Information fields using values extracted from the uploaded artwork. A reviewer can then change individual expected values to verify mismatch and missing-data detection.
 
 In a production implementation, expected application information would be retrieved independently from the authoritative application system rather than generated from the label being reviewed.
+
+## Example Test Labels
+
+Two example label images are included in the `examples/` directory for demonstration and testing:
+
+- `sample-lager-label.png` - Example lager label containing brand, beverage type, alcohol content, net contents, producer information, country information, and Government Health Warning text.
+- `sample-craft-ale-label.png` - Example craft beer label used to demonstrate extraction when some expected application information may not be detected. Missing or unavailable expected information may be reported as `NOT CHECKED` rather than being inferred.
+
+These examples are provided to make it easier to test the prototype without locating separate label artwork.
+
+A reviewer may upload either example, run AI extraction, use **Create Test Application from Extracted Label**, and then modify one or more Application Information fields to test discrepancy detection.
 
 ## Developer Test Mode
 
@@ -211,10 +223,12 @@ The prototype does not:
 - Implement production identity and access management.
 - Implement enterprise audit logging.
 - Evaluate every visual presentation requirement automatically.
+- Requires outbound access to the configured AI API; restricted networks may prevent AI extraction.
+- Processes one label at a time; batch processing is a potential future enhancement.
 
 ## Testing
 
-The prototype was tested using label artwork containing:
+The prototype was tested using multiple alcohol beverage labels containing:
 
 - Multiple label panels
 - Rotated text
@@ -225,7 +239,22 @@ The prototype was tested using label artwork containing:
 - Country-of-origin information
 - Government Health Warning text
 
-Testing included successful matches as well as intentionally introduced mismatches and missing information.
+The included test files are:
+
+- `examples/sample-lager-label.png`
+- `examples/sample-craft-ale-label.png`
+
+Testing included:
+
+- Successful field matches
+- Intentional field mismatches
+- Missing extracted information
+- `NOT CHECKED` handling when expected information is unavailable
+- Government Health Warning validation
+- AI extraction from differently formatted label artwork
+- AI extraction completing in under five seconds during local testing
+
+The craft beer example also demonstrates that the application does not invent unavailable information when a field cannot be confidently extracted.
 
 ## AI-Assisted Development
 
