@@ -2,6 +2,12 @@
 
 An AI-assisted proof-of-concept for comparing alcohol beverage label artwork against expected application information.
 
+## Live Application
+
+The deployed proof-of-concept is available at:
+
+https://alcohol-label-verification-poc.streamlit.app/
+
 ## Purpose
 
 This prototype demonstrates how artificial intelligence can assist a reviewer by extracting information from alcohol beverage label artwork and comparing the extracted information with expected application data.
@@ -274,4 +280,6 @@ Working proof-of-concept supporting:
 - Manual developer testing
 - Human-review-oriented results
 
-A hosted application URL will be added after deployment.
+Deployed application:
+
+https://alcohol-label-verification-poc.streamlit.app/
